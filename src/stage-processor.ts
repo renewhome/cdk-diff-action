@@ -169,6 +169,8 @@ export class AssemblyProcessor {
       method: this.options.diffMethod,
     });
 
+    console.log(`Diff result: ${JSON.stringify(diffResult, null, 2)}`);
+
     this._templateDiffs = diffResult;
     await using cloudAssembly = await assemblySource.produce();
     this.processAssembly(cloudAssembly.cloudAssembly);
