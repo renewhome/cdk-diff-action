@@ -38,6 +38,7 @@ export async function run() {
   ) {
     inputs.stackSelectionStrategy = 'pattern-must-match';
   }
+  console.log("DEBUGGING HERE");
 
   debug(`Inputs: ${JSON.stringify(inputs, null, 2)}`);
 
