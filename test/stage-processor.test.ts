@@ -114,7 +114,7 @@ describe('StageProcessor', () => {
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -152,7 +152,7 @@ describe('StageProcessor', () => {
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -191,7 +191,7 @@ describe('StageProcessor', () => {
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -230,7 +230,7 @@ describe('StageProcessor', () => {
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -265,7 +265,7 @@ describe('StageProcessor', () => {
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -376,7 +376,7 @@ describe('StageProcessor', () => {
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -451,7 +451,7 @@ describe('default stage', () => {
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -480,7 +480,7 @@ describe('default stage', () => {
       title: 'Diff for MyStage',
       toolkit,
       allowedDestroyTypes: [],
-      cdkOutDir: 'cdk.out',
+      cdkOutDir: ['cdk.out'],
       diffMethod: DiffMethod.LocalFile(
         'cdk.out/SomeStage-test-stack.template.json',
       ),
@@ -541,7 +541,7 @@ function setupCommentTest(): AssemblyProcessor {
     defaultStageDisplayName: 'DefaultStage',
     toolkit,
     allowedDestroyTypes: [],
-    cdkOutDir: 'cdk.out',
+    cdkOutDir: ['cdk.out'],
     diffMethod: DiffMethod.TemplateOnly(),
     failOnDestructiveChanges: true,
     stackSelectorPatterns: [],

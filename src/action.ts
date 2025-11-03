@@ -28,7 +28,7 @@ export async function run() {
       required: true,
     }),
     noFailOnDestructiveChanges: getMultilineInput('noFailOnDestructiveChanges'),
-    cdkOutDir: getInput('cdkOutDir', { required: true }),
+    cdkOutDir: getMultilineInput('cdkOutDir', { required: true }),
     diffMethod: getInput('diffMethod', { required: true }),
   };
 
@@ -38,7 +38,6 @@ export async function run() {
   ) {
     inputs.stackSelectionStrategy = 'pattern-must-match';
   }
-  console.log("DEBUGGING HERE");
 
   debug(`Inputs: ${JSON.stringify(inputs, null, 2)}`);
 

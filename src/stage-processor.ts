@@ -43,6 +43,12 @@ interface StageComment {
   destructiveChanges: number;
 }
 
+interface AppDetails {
+  stageInfo?: StageInfo[];
+  stages?: StageDiffInfo[];
+  templateDiffs?: { [stackName: string]: TemplateDiff };
+}
+
 export interface AssemblyProcessorOptions
   extends Omit<Inputs, 'githubToken' | 'diffMethod'> {
   diffMethod: DiffMethod;
@@ -62,6 +68,9 @@ export class AssemblyProcessor {
   private _stageInfo?: StageInfo[];
   private _stages?: StageDiffInfo[];
   private _templateDiffs?: { [stackName: string]: TemplateDiff };
+
+  private _appDetails?: AppDetails[];
+
   constructor(private options: AssemblyProcessorOptions) {}
 
   private get stageInfo(): StageInfo[] {
@@ -141,9 +150,28 @@ export class AssemblyProcessor {
     return this._stages;
   }
 
-  public async diffApp(): Promise<{ [name: string]: TemplateDiff }> {
+  public async diffApps(): Promise<AppDetails[]> {
+    console.log("Apps: ", this.options.cdkOutDir);
+    return Promise.all(this.options.cdkOutDir.map(async (dir) => {
+      this._templateDiffs = {};
+      this._stageInfo = undefined;
+      this._stages = undefined;
+
+      console.log("Diffing directory: ", dir);
+      await this.diffApp(dir);
+      console.log("App result", this._templateDiffs, this._stages, this._stageInfo);
+
+      return {
+        stageInfo: this._stageInfo,
+        stages: this._stages,
+        templateDiffs: this._templateDiffs,
+      };
+    }));
+  }
+
+  public async diffApp(cdkOutDir: string): Promise<{ [name: string]: TemplateDiff }> {
     const assemblySource = await this.options.toolkit.fromAssemblyDirectory(
-      this.options.cdkOutDir,
+      cdkOutDir,
       {
         // When checkVersion=true it means users can't upgrade their CDK version before
         // we do and they pull in the new action version. Probably better to default to false
@@ -169,16 +197,13 @@ export class AssemblyProcessor {
       method: this.options.diffMethod,
     });
 
-    console.log("JSON STRINGIFY DIFF RESULT:");
-    console.log(JSON.stringify(diffResult, null, 2));
-
+    // Ignore differences in Tags
     for (const [_, stackDiff] of Object.entries(diffResult)) {
       if (!stackDiff['resources'] || !stackDiff['resources']['diffs']) {
         continue;
       }
       for (const [_, resourceDiff] of Object.entries(stackDiff['resources']['diffs'])) {
         const typedResourceDiff = resourceDiff as ResourceDifference;
-        console.log(typedResourceDiff)
         if (typedResourceDiff['propertyDiffs']['Tags']) {
           typedResourceDiff['propertyDiffs']['Tags']['isDifferent'] = false;
           typedResourceDiff['propertyDiffs']['Tags']['changeImpact'] = ResourceImpact.NO_CHANGE;
@@ -197,26 +222,33 @@ export class AssemblyProcessor {
    * the comment can be created with `commentStages()`
    */
   public async processStages(ignoreDestructiveChanges: string[] = []) {
-    if (!this._templateDiffs) {
-      await this.diffApp();
+    if (!this._appDetails) {
+      this._appDetails = await this.diffApps();
     }
-    debug(`Diffs: ${JSON.stringify(this._templateDiffs, null, 2)}`);
-    for (const stage of this.stageDiffInfo) {
-      for (const stack of stage.stacks) {
-        try {
-          const { comment, changes } = await this.diffStack(stack);
-          debug(
-            `Diff for stack ${stack.stackName}: ${JSON.stringify(comment, null, 2)}`,
-          );
-          this.stageComments[stage.name].stackComments[stack.stackName].push(
-            ...comment,
-          );
-          if (!ignoreDestructiveChanges.includes(stage.name)) {
-            this.stageComments[stage.name].destructiveChanges += changes;
+    console.log(`App details: ${JSON.stringify(this._appDetails, null, 2)}`);
+
+    for (let i = 0; i < this._appDetails.length; i++) {
+      this._stageInfo = this._appDetails[i].stageInfo;
+      this._stages = this._appDetails[i].stages;
+      this._templateDiffs = this._appDetails[i].templateDiffs;
+
+      for (const stage of this.stageDiffInfo) {
+        for (const stack of stage.stacks) {
+          try {
+            const { comment, changes } = await this.diffStack(stack);
+            debug(
+              `Diff for stack ${stack.stackName}: ${JSON.stringify(comment, null, 2)}`,
+            );
+            this.stageComments[stage.name].stackComments[stack.stackName].push(
+              ...comment,
+            );
+            if (!ignoreDestructiveChanges.includes(stage.name)) {
+              this.stageComments[stage.name].destructiveChanges += changes;
+            }
+          } catch (e: any) {
+            console.error('Error processing stages: ', e);
+            throw e;
           }
-        } catch (e: any) {
-          console.error('Error processing stages: ', e);
-          throw e;
         }
       }
     }
