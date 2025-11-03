@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import { Writable, WritableOptions } from 'stream';
 import { StringDecoder } from 'string_decoder';
 import { debug } from '@actions/core';
-import { ResourceImpact, TemplateDiff, formatDifferences } from '@aws-cdk/cloudformation-diff';
+import { ResourceDifference, ResourceImpact, TemplateDiff, formatDifferences } from '@aws-cdk/cloudformation-diff';
 import { CloudAssembly } from '@aws-cdk/cx-api';
 import {
   DiffMethod,
@@ -174,7 +174,8 @@ export class AssemblyProcessor {
         continue;
       }
       for (const [_, resourceDiff] of Object.entries(stackDiff['resources']['diffs'])) {
-        const typedResourceDiff = resourceDiff as any;
+        const typedResourceDiff = resourceDiff as ResourceDifference;
+        console.log(typedResourceDiff)
         if (typedResourceDiff['propertyDiffs']['Tags']) {
           typedResourceDiff['propertyDiffs']['Tags']['isDifferent'] = false;
           typedResourceDiff['propertyDiffs']['Tags']['changeImpact'] = ResourceImpact.NO_CHANGE;
