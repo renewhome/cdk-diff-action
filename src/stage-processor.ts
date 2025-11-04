@@ -160,9 +160,17 @@ export class AssemblyProcessor {
       this._stages = undefined;
 
       console.log("Diffing directory: ", dir);
-      await this.diffApp(dir);
+      try {
+        await this.diffApp(dir);
+      } catch (e: any) {
+        if (e.message.includes('This app contains no stacks')) {
+          console.warn('Empty app: ', e);
+          continue;
+        }
+        console.error('Error diffing app: ', e);
+        throw e;
+      }
       console.log("Finished directory: ", dir);
-      // console.log("App result", this._templateDiffs, this._stages, this._stageInfo);
 
       apps.push({
         stageInfo: this._stageInfo,
