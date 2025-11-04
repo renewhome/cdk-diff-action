@@ -242,6 +242,10 @@ export class AssemblyProcessor {
       this._templateDiffs = this._appDetails[i].templateDiffs;
 
       console.log("App", i, !!this._stageInfo, !!this._templateDiffs);
+      if (!this._stageInfo || !this._templateDiffs) {
+        console.warn('No stages or template diffs found, skipping app');
+        continue;
+      }
 
       await this.processApp(ignoreDestructiveChanges);
     }
