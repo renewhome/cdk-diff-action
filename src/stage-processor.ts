@@ -171,8 +171,10 @@ export class AssemblyProcessor {
           console.warn('Authentication error: ', e);
           continue;
         }
-        console.error('Error diffing app: ', e);
-        throw e;
+        else {
+          console.error('Error diffing app: ', e);
+          // throw e;
+        }
       }
       console.log("Finished directory: ", dir);
 
