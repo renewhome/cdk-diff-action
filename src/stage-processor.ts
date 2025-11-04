@@ -167,7 +167,7 @@ export class AssemblyProcessor {
           console.warn('Empty app: ', e);
           continue;
         }
-        else if (e.message.includes('AuthenticationError')) {
+        else if (e.message.includes('AuthenticationError') || e.message.includes('Could not assume role')) {
           console.warn('Authentication error: ', e);
           continue;
         }
