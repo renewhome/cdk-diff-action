@@ -236,23 +236,27 @@ export class AssemblyProcessor {
       this._stages = this._appDetails[i].stages;
       this._templateDiffs = this._appDetails[i].templateDiffs;
 
-      for (const stage of this.stageDiffInfo) {
-        for (const stack of stage.stacks) {
-          try {
-            const { comment, changes } = await this.diffStack(stack);
-            debug(
-              `Diff for stack ${stack.stackName}: ${JSON.stringify(comment, null, 2)}`,
-            );
-            this.stageComments[stage.name].stackComments[stack.stackName].push(
-              ...comment,
-            );
-            if (!ignoreDestructiveChanges.includes(stage.name)) {
-              this.stageComments[stage.name].destructiveChanges += changes;
-            }
-          } catch (e: any) {
-            console.error('Error processing stages: ', e);
-            throw e;
+      await this.processApp(ignoreDestructiveChanges);
+    }
+  }
+
+  public async processApp(ignoreDestructiveChanges: string[] = []) {
+    for (const stage of this.stageDiffInfo) {
+      for (const stack of stage.stacks) {
+        try {
+          const { comment, changes } = await this.diffStack(stack);
+          debug(
+            `Diff for stack ${stack.stackName}: ${JSON.stringify(comment, null, 2)}`,
+          );
+          this.stageComments[stage.name].stackComments[stack.stackName].push(
+            ...comment,
+          );
+          if (!ignoreDestructiveChanges.includes(stage.name)) {
+            this.stageComments[stage.name].destructiveChanges += changes;
           }
+        } catch (e: any) {
+          console.error('Error processing stages: ', e);
+          throw e;
         }
       }
     }
