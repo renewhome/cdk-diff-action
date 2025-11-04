@@ -153,21 +153,24 @@ export class AssemblyProcessor {
 
   public async diffApps(): Promise<AppDetails[]> {
     console.log("Apps: ", this.options.cdkOutDir);
-    return Promise.all(this.options.cdkOutDir.map(async (dir) => {
+    const apps: AppDetails[] = [];
+    for (const dir of this.options.cdkOutDir) {
       this._templateDiffs = {};
       this._stageInfo = undefined;
       this._stages = undefined;
 
       console.log("Diffing directory: ", dir);
       await this.diffApp(dir);
-      console.log("App result", this._templateDiffs, this._stages, this._stageInfo);
+      console.log("Finished directory: ", dir);
+      // console.log("App result", this._templateDiffs, this._stages, this._stageInfo);
 
-      return {
+      apps.push({
         stageInfo: this._stageInfo,
         stages: this._stages,
         templateDiffs: this._templateDiffs,
-      };
-    }));
+      });
+    }
+    return apps;
   }
 
   public async diffApp(cdkOutDir: string): Promise<{ [name: string]: TemplateDiff }> {
@@ -226,7 +229,7 @@ export class AssemblyProcessor {
     if (!this._appDetails) {
       this._appDetails = await this.diffApps();
     }
-    console.log(`App details: ${JSON.stringify(this._appDetails, null, 2)}`);
+    // console.log(`App details: ${JSON.stringify(this._appDetails, null, 2)}`);
 
     for (let i = 0; i < this._appDetails.length; i++) {
       this._stageInfo = this._appDetails[i].stageInfo;
