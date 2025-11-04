@@ -167,6 +167,10 @@ export class AssemblyProcessor {
           console.warn('Empty app: ', e);
           continue;
         }
+        else if (e.message.includes('AuthenticationError')) {
+          console.warn('Authentication error: ', e);
+          continue;
+        }
         console.error('Error diffing app: ', e);
         throw e;
       }
