@@ -45,7 +45,6 @@ interface StageComment {
 
 interface AppDetails {
   stageInfo?: StageInfo[];
-  stages?: StageDiffInfo[];
   templateDiffs?: { [stackName: string]: TemplateDiff };
 }
 
@@ -67,7 +66,6 @@ export class AssemblyProcessor {
    */
   public readonly stageComments: { [stageName: string]: StageComment } = {};
   private _stageInfo?: StageInfo[];
-  private _stages?: StageDiffInfo[];
   private _templateDiffs?: { [stackName: string]: TemplateDiff };
 
   private _appDetails?: AppDetails[];
@@ -103,10 +101,7 @@ export class AssemblyProcessor {
   }
 
   private get stageDiffInfo(): StageDiffInfo[] {
-    if (this._stages) {
-      return this._stages;
-    }
-    this._stages = this.stageInfo.flatMap((stage) => {
+    return this.stageInfo.flatMap((stage) => {
       this.stageComments[stage.name] = {
         title: this.options.title,
         destructiveChanges: 0,
@@ -148,7 +143,6 @@ export class AssemblyProcessor {
         }),
       };
     });
-    return this._stages;
   }
 
   public async diffApps(): Promise<AppDetails[]> {
@@ -157,7 +151,6 @@ export class AssemblyProcessor {
     for (const dir of this.options.cdkOutDir) {
       this._templateDiffs = {};
       this._stageInfo = undefined;
-      this._stages = undefined;
 
       console.log("Diffing directory: ", dir);
       try {
@@ -180,7 +173,6 @@ export class AssemblyProcessor {
 
       apps.push({
         stageInfo: this._stageInfo,
-        stages: this._stages,
         templateDiffs: this._templateDiffs,
       });
     }
@@ -247,8 +239,9 @@ export class AssemblyProcessor {
 
     for (let i = 0; i < this._appDetails.length; i++) {
       this._stageInfo = this._appDetails[i].stageInfo;
-      this._stages = this._appDetails[i].stages;
       this._templateDiffs = this._appDetails[i].templateDiffs;
+
+      console.log("App", i, !!this._stageInfo, !!this._templateDiffs);
 
       await this.processApp(ignoreDestructiveChanges);
     }
