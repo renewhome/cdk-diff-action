@@ -237,18 +237,35 @@ export class AssemblyProcessor {
     }
     // console.log(`App details: ${JSON.stringify(this._appDetails, null, 2)}`);
 
-    for (let i = 0; i < this._appDetails.length; i++) {
-      this._stageInfo = this._appDetails[i].stageInfo;
-      this._templateDiffs = this._appDetails[i].templateDiffs;
+    const mergedStageInfo: StageInfo[] = [];
+    const mergedTemplateDiffs: { [stackName: string]: TemplateDiff } = {};
 
-      console.log("App", i, !!this._stageInfo, !!this._templateDiffs);
-      if (!this._stageInfo || !this._templateDiffs) {
-        console.warn('No stages or template diffs found, skipping app');
+    for (let i = 0; i < this._appDetails.length; i++) {
+      const stageInfo = this._appDetails[i].stageInfo, templateDiffs = this._appDetails[i].templateDiffs;
+      if (!stageInfo || !templateDiffs) {
         continue;
       }
 
-      await this.processApp(ignoreDestructiveChanges);
+      for (const stage of stageInfo) {
+        const existingStage = mergedStageInfo.find(s => s.name === stage.name);
+        if (existingStage) {
+          existingStage.stacks.push(...stage.stacks);
+        } else {
+          mergedStageInfo.push(stage);
+        }
+      }
+      for (const [stackName, templateDiff] of Object.entries(templateDiffs)) {
+        mergedTemplateDiffs[stackName] = templateDiff;
+      }
     }
+
+    // console.log(`Merged stage info: ${JSON.stringify(mergedStageInfo, null, 2)}`);
+    // console.log(`Merged template diffs: ${JSON.stringify(mergedTemplateDiffs, null, 2)}`);
+
+    this._stageInfo = mergedStageInfo;
+    this._templateDiffs = mergedTemplateDiffs;
+
+    await this.processApp(ignoreDestructiveChanges);
   }
 
   public async processApp(ignoreDestructiveChanges: string[] = []) {
