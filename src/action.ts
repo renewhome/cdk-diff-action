@@ -28,7 +28,7 @@ export async function run() {
       required: true,
     }),
     noFailOnDestructiveChanges: getMultilineInput('noFailOnDestructiveChanges'),
-    cdkOutDir: getMultilineInput('cdkOutDir', { required: true }),
+    cdkOutDir: getInput('cdkOutDir', { required: true }),
     diffMethod: getInput('diffMethod', { required: true }),
   };
 
@@ -59,6 +59,7 @@ export async function run() {
       ...inputs,
       diffMethod: method,
       toolkit,
+      cdkOutDir: JSON.parse(inputs.cdkOutDir),
     });
     try {
       await processor.processStages(inputs.noFailOnDestructiveChanges);

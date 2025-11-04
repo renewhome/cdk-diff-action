@@ -68,7 +68,7 @@ export interface Inputs {
    *
    * @default cdk.out
    */
-  cdkOutDir: string[];
+  cdkOutDir: string;
 
   /**
    * An optional display name for the CDK default stage.

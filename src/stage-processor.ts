@@ -50,10 +50,11 @@ interface AppDetails {
 }
 
 export interface AssemblyProcessorOptions
-  extends Omit<Inputs, 'githubToken' | 'diffMethod'> {
+  extends Omit<Inputs, 'githubToken' | 'diffMethod' | 'cdkOutDir'> {
   diffMethod: DiffMethod;
   toolkit: Toolkit;
   defaultStageDisplayName: string;
+  cdkOutDir: string[];
 }
 
 /**
