@@ -46,6 +46,7 @@ interface StageComment {
 interface AppDetails {
   stageInfo?: StageInfo[];
   templateDiffs?: { [stackName: string]: TemplateDiff };
+  error?: string;
 }
 
 export interface AssemblyProcessorOptions
@@ -133,30 +134,32 @@ export class AssemblyProcessor {
   }
 
   public async diffApps(): Promise<AppDetails[]> {
-    const apps: AppDetails[] = [];
-    for (const dir of this.options.cdkOutDir) {
-      console.log("Diffing directory: ", dir);
-      try {
-        const appDetails = await this.diffApp(dir);
-        apps.push(appDetails);
-      } catch (e: any) {
-        if (e.message.includes('This app contains no stacks')) {
-          console.warn('Empty app: ', e);
-          continue;
+    return Promise.all(
+      this.options.cdkOutDir.map(async (dir) => {
+        try {
+          return await this.diffApp(dir);
+        } catch (e: any) {
+          const appDetails: AppDetails = {};
+          if (e.message.includes('This app contains no stacks')) {
+            console.warn('Empty app: ', e);
+            appDetails.error = 'This app contains no stacks';
+          }
+          else if (e.message.includes('AuthenticationError') || e.message.includes('Could not assume role')) {
+            console.warn('Authentication error: ', e);
+            appDetails.error = 'Authentication error: ' + e.message;
+          }
+          else {
+            console.error('Error diffing app: ', e);
+            appDetails.error = 'Error diffing app: ' + e.message;
+          }
+          return appDetails;
         }
-        else if (e.message.includes('AuthenticationError') || e.message.includes('Could not assume role')) {
-          console.warn('Authentication error: ', e);
-          continue;
-        }
-        else {
-          console.error('Error diffing app: ', e);
-        }
-      }
-    }
-    return apps;
+      })
+    );
   }
 
   public async diffApp(cdkOutDir: string): Promise<AppDetails> {
+    console.log("Diffing directory: ", cdkOutDir);
     const appDetails : AppDetails = {};
     const assemblySource = await this.options.toolkit.fromAssemblyDirectory(
       cdkOutDir,
