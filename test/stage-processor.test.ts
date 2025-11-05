@@ -159,8 +159,7 @@ describe('StageProcessor', () => {
       'cdk2.out': mockOutDir2,
       node_modules: mock.load(path.join(__dirname, '..', 'node_modules')),
     });
-    console.log(mockOutDir);
-    console.log(mockOutDir2);
+
     const processor = new AssemblyProcessor({
       defaultStageDisplayName: 'DefaultStage',
       toolkit,
