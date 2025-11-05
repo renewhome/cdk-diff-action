@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import path from 'path';
 import * as core from '@actions/core';
 import {
@@ -15,7 +14,7 @@ import type {
   OctokitResponse,
 } from '@octokit/types';
 import mock from 'mock-fs';
-import { FakeIoHost } from './util';
+import { buildCdkOut, FakeIoHost } from './util';
 import { Comments } from '../src/comment';
 import { AssemblyProcessor } from '../src/stage-processor';
 jest.spyOn(core, 'debug').mockImplementation(() => {});
@@ -39,52 +38,14 @@ jest.mock('../src/comment', () => {
   };
 });
 
-const cdkout = {
-  'manifest.json': JSON.stringify({
-    version: '36.0.0',
-    artifacts: {
-      'assembly-SomeStage': {
-        type: 'cdk:cloud-assembly',
-        properties: {
-          directoryName: 'assembly-SomeStage',
-          displayName: 'SomeStage',
-        },
-      },
-    },
-  }),
-  ['assembly-SomeStage']: {
-    ['manifest.json']: JSON.stringify({
-      version: '36.0.0',
-      artifacts: {
-        'SomeStage-test-stack': {
-          type: 'aws:cloudformation:stack',
-          environment: 'aws://unknown-account/unknown-region',
-          properties: {
-            templateFile: 'SomeStage-test-stack.template.json',
-            validateOnSynth: false,
-            stackName: 'SomeStage-test-stack',
-          },
-          displayName: 'SomeStage/test-stack',
-        },
-      },
-    }),
-    ['SomeStage-test-stack.template.json']: JSON.stringify({
-      Resources: {
-        MyRole: {
-          Type: 'AWS::IAM::Role',
-          Properties: {
-            RoleName: 'MyCustomName',
-          },
-        },
-      },
-    }),
-  },
-};
+const cdkout = buildCdkOut('SomeStage', 'test-stack');
+const cdkout2 = buildCdkOut('SomeStage', 'second-stack');
 
-let mockOutDir: any;
+let mockOutDir: any, mockOutDir2: any;
 
 beforeEach(() => {
   mockOutDir = cdkout;
+  mockOutDir2 = cdkout2;
 });
 
 afterEach(() => {
@@ -170,6 +131,63 @@ describe('StageProcessor', () => {
       p.SomeStage.stackComments['SomeStage/test-stack'].length,
     ).not.toEqual(0);
     expect(p.SomeStage.destructiveChanges).toEqual(1);
+  });
+
+  test('stage with multiple diffs distinctive', async () => {
+    mockOutDir['SomeStage-test-stack.template.json'] = JSON.stringify({
+      Resources: {
+        MyRole: {
+          Type: 'AWS::IAM::Role',
+          Properties: {
+            RoleName: 'MyCustomName2',
+          },
+        },
+      },
+    });
+    mockOutDir2['SomeStage-second-stack.template.json'] = JSON.stringify({
+      Resources: {
+        MyRole: {
+          Type: 'AWS::IAM::Role',
+          Properties: {
+            RoleName: 'MyCustomName3',
+          },
+        },
+      },
+    });
+    mock({
+      'cdk.out': mockOutDir,
+      'cdk2.out': mockOutDir2,
+      node_modules: mock.load(path.join(__dirname, '..', 'node_modules')),
+    });
+    console.log(mockOutDir);
+    console.log(mockOutDir2);
+    const processor = new AssemblyProcessor({
+      defaultStageDisplayName: 'DefaultStage',
+      toolkit,
+      allowedDestroyTypes: [],
+      cdkOutDir: ['cdk.out', 'cdk2.out'],
+      diffMethod: DiffMethod.LocalFile(
+        'cdk.out/SomeStage-test-stack.template.json',
+      ),
+      failOnDestructiveChanges: true,
+      stackSelectorPatterns: [],
+      stackSelectionStrategy: 'all-stacks',
+      noFailOnDestructiveChanges: [],
+    });
+    await processor.processStages();
+    const p = (processor as any).stageComments;
+    console.log('RESULT', p);
+    expect(p).toEqual({
+      SomeStage: expect.any(Object),
+    });
+    expect(Object.keys(p.SomeStage.stackComments).length).toEqual(2);
+    expect(
+      p.SomeStage.stackComments['SomeStage/test-stack'].length,
+    ).not.toEqual(0);
+    expect(
+      p.SomeStage.stackComments['SomeStage/second-stack'].length,
+    ).not.toEqual(0);
+    expect(p.SomeStage.destructiveChanges).toEqual(2);
   });
 
   test('stage with destructive changes-ignored', async () => {
