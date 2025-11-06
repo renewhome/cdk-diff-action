@@ -59,6 +59,7 @@ export async function run() {
       ...inputs,
       diffMethod: method,
       toolkit,
+      cdkOutDir: JSON.parse(inputs.cdkOutDir),
     });
     try {
       await processor.processStages(inputs.noFailOnDestructiveChanges);
