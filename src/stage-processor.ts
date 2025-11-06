@@ -44,6 +44,7 @@ interface StageComment {
 }
 
 interface AppDetails {
+  cdkOutDir: string;
   stageInfo?: StageInfo[];
   templateDiffs?: { [stackName: string]: TemplateDiff };
   error?: string;
@@ -66,6 +67,11 @@ export class AssemblyProcessor {
    * @internal
    */
   public readonly stageComments: { [stageName: string]: StageComment } = {};
+
+  /**
+   * Any other messages to include in the stage comment.
+   */
+  public readonly otherMessages: string[] = [];
 
   private _appDetails?: AppDetails[];
 
@@ -139,7 +145,7 @@ export class AssemblyProcessor {
         try {
           return await this.diffApp(dir);
         } catch (e: any) {
-          const appDetails: AppDetails = {};
+          const appDetails: AppDetails = {cdkOutDir: dir};
           if (e.message.includes('This app contains no stacks')) {
             console.warn('Empty app: ', e);
             appDetails.error = 'This app contains no stacks';
@@ -160,7 +166,7 @@ export class AssemblyProcessor {
 
   public async diffApp(cdkOutDir: string): Promise<AppDetails> {
     console.log("Diffing directory: ", cdkOutDir);
-    const appDetails : AppDetails = {};
+    const appDetails : AppDetails = {cdkOutDir};
     const assemblySource = await this.options.toolkit.fromAssemblyDirectory(
       cdkOutDir,
       {
@@ -218,26 +224,27 @@ export class AssemblyProcessor {
     }
 
     const mergedStageInfo: StageInfo[] = [];
-    const mergedTemplateDiffs: { [stackName: string]: TemplateDiff } = {};
+    let mergedTemplateDiffs: { [stackName: string]: TemplateDiff } = {};
 
-    for (let i = 0; i < this._appDetails.length; i++) {
-      const stageInfo = this._appDetails[i].stageInfo, templateDiffs = this._appDetails[i].templateDiffs;
-      if (!stageInfo || !templateDiffs) {
-        continue;
+    // Across multiple apps, merge stage info and template diffs
+    this._appDetails.forEach((appDetails, _i) => {
+      // Check for errors
+      if (appDetails.error) {
+        this.otherMessages.push(`Error processing app at ${appDetails.cdkOutDir}: ${appDetails.error}`);
+        return;
+      }
+      if (!appDetails.stageInfo || !appDetails.templateDiffs) {
+        this.otherMessages.push(`Missing information for ${appDetails.cdkOutDir}`);
+        return;
       }
 
-      for (const stage of stageInfo) {
+      // Merge stage info and template diffs
+      for (const stage of appDetails.stageInfo) {
         const existingStage = mergedStageInfo.find(s => s.name === stage.name);
-        if (existingStage) {
-          existingStage.stacks.push(...stage.stacks);
-        } else {
-          mergedStageInfo.push(stage);
-        }
+        existingStage ? existingStage.stacks.push(...stage.stacks) : mergedStageInfo.push(stage);
       }
-      for (const [stackName, templateDiff] of Object.entries(templateDiffs)) {
-        mergedTemplateDiffs[stackName] = templateDiff;
-      }
-    }
+      mergedTemplateDiffs = {...mergedTemplateDiffs, ...appDetails.templateDiffs };
+    });
 
     const stageDiffInfo = this.stageDiffInfo(mergedStageInfo, mergedTemplateDiffs);
     await this.processApp(ignoreDestructiveChanges, stageDiffInfo);
@@ -497,6 +504,12 @@ export class AssemblyProcessor {
         `> [!WARNING]\n> ${stageComments.destructiveChanges} Destructive Changes`,
       );
       output.push('');
+    }
+    if (this.otherMessages) {
+      for (const msg of this.otherMessages) {
+        output.push(`> ${msg}`);
+        output.push('');
+      }
     }
     return output.concat(comments);
   }

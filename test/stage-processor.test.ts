@@ -14,7 +14,7 @@ import type {
   OctokitResponse,
 } from '@octokit/types';
 import mock from 'mock-fs';
-import { buildCdkOut, FakeIoHost } from './util';
+import { buildCdkOut, emptyCdkOut, FakeIoHost } from './util';
 import { Comments } from '../src/comment';
 import { AssemblyProcessor } from '../src/stage-processor';
 jest.spyOn(core, 'debug').mockImplementation(() => {});
@@ -56,6 +56,33 @@ afterEach(() => {
 });
 
 describe('StageProcessor', () => {
+  test('stage with no stacks distinctive', async () => {
+    mock({
+      'cdk.out': emptyCdkOut('SomeStage'),
+      node_modules: mock.load(path.join(__dirname, '..', 'node_modules')),
+    });
+    const processor = new AssemblyProcessor({
+      defaultStageDisplayName: 'DefaultStage',
+      toolkit,
+      allowedDestroyTypes: [],
+      cdkOutDir: ['cdk.out'],
+      diffMethod: DiffMethod.LocalFile(
+        'cdk.out/SomeStage-test-stack.template.json',
+      ),
+      failOnDestructiveChanges: true,
+      stackSelectorPatterns: [],
+      stackSelectionStrategy: 'all-stacks',
+      noFailOnDestructiveChanges: [],
+    });
+    await processor.processStages();
+    const p = processor.stageComments;
+    expect(p).toEqual({});
+    expect(processor.otherMessages.length).toEqual(1);
+    expect(processor.otherMessages[0]).toEqual(
+      'Error processing app at cdk.out: This app contains no stacks',
+    );
+  });
+
   test('stage with no diffs', async () => {
     mockOutDir['SomeStage-test-stack.template.json'] = JSON.stringify({
       Resources: {
@@ -133,7 +160,7 @@ describe('StageProcessor', () => {
     expect(p.SomeStage.destructiveChanges).toEqual(1);
   });
 
-  test('stage with multiple diffs distinctive', async () => {
+  test('stage with multiple diffs', async () => {
     mockOutDir['SomeStage-test-stack.template.json'] = JSON.stringify({
       Resources: {
         MyRole: {

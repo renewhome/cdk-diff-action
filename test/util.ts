@@ -9,6 +9,29 @@ export class FakeIoHost implements IIoHost {
   }
 }
 
+export function emptyCdkOut(stage: string): Record<string, any> {
+  return {
+    'manifest.json': JSON.stringify({
+      version: '36.0.0',
+      artifacts: {
+        [`assembly-${stage}`]: {
+          type: 'cdk:cloud-assembly',
+          properties: {
+            directoryName: `assembly-${stage}`,
+            displayName: stage,
+          },
+        },
+      },
+    }),
+    [`assembly-${stage}`]: {
+      ['manifest.json']: JSON.stringify({
+        version: '36.0.0',
+        artifacts: {},
+      }),
+    },
+  };
+}
+
 export function buildCdkOut(
   stage: string,
   stackName: string,
