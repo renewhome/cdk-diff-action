@@ -507,12 +507,14 @@ export class AssemblyProcessor {
     }
     if (this.otherMessages) {
       output.push('<details><summary>Other Information</summary>');
-      output.push('```');
+      output.push('');
+      output.push('```shell');
       for (const msg of this.otherMessages) {
         output.push(msg);
         output.push('');
       }
       output.push('```');
+      output.push('');
       output.push('</details>');
     }
     return output.concat(comments);
