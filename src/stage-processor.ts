@@ -506,10 +506,14 @@ export class AssemblyProcessor {
       output.push('');
     }
     if (this.otherMessages) {
+      output.push('<details><summary>Other Information</summary>');
+      output.push('```');
       for (const msg of this.otherMessages) {
-        output.push(`> ${msg}`);
+        output.push(msg);
         output.push('');
       }
+      output.push('```');
+      output.push('</details>');
     }
     return output.concat(comments);
   }
