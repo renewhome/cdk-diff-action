@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import { Writable, WritableOptions } from 'stream';
 import { StringDecoder } from 'string_decoder';
 import { debug } from '@actions/core';
-import { ResourceDifference, ResourceImpact, TemplateDiff, formatDifferences } from '@aws-cdk/cloudformation-diff';
+import { TemplateDiff, formatDifferences } from '@aws-cdk/cloudformation-diff';
 import { CloudAssembly } from '@aws-cdk/cx-api';
 import {
   DiffMethod,
@@ -43,19 +43,11 @@ interface StageComment {
   destructiveChanges: number;
 }
 
-interface AppDetails {
-  cdkOutDir: string;
-  stageInfo?: StageInfo[];
-  templateDiffs?: { [stackName: string]: TemplateDiff };
-  error?: string;
-}
-
 export interface AssemblyProcessorOptions
-  extends Omit<Inputs, 'githubToken' | 'diffMethod' | 'cdkOutDir'> {
+  extends Omit<Inputs, 'githubToken' | 'diffMethod'> {
   diffMethod: DiffMethod;
   toolkit: Toolkit;
   defaultStageDisplayName: string;
-  cdkOutDir: string[];
 }
 
 /**
@@ -67,35 +59,44 @@ export class AssemblyProcessor {
    * @internal
    */
   public readonly stageComments: { [stageName: string]: StageComment } = {};
-
-  /**
-   * Any other messages to include in the stage comment.
-   */
-  public readonly otherMessages: string[] = [];
-
-  private _appDetails?: AppDetails[];
-
+  private _stageInfo?: StageInfo[];
+  private _stages?: StageDiffInfo[];
+  private _templateDiffs?: { [stackName: string]: TemplateDiff };
   constructor(private options: AssemblyProcessorOptions) {}
 
-  private processAssembly(cloudAssembly: CloudAssembly, appDetails: AppDetails) {
-    if (!appDetails.templateDiffs) {
-      throw new Error('Template diffs have not been created yet');
+  private get stageInfo(): StageInfo[] {
+    if (!this._stageInfo) {
+      throw new Error('Stage info has not been created yet');
     }
+    return this._stageInfo;
+  }
+
+  private processAssembly(cloudAssembly: CloudAssembly) {
     const assembly = new AssemblyManifestReader(
       cloudAssembly,
-      appDetails.templateDiffs,
+      this.templateDiffs,
     );
-    appDetails.stageInfo = assembly.stages;
+    this._stageInfo = assembly.stages;
     if (assembly.stacks.length) {
-      appDetails.stageInfo.push({
+      this.stageInfo.push({
         name: this.options.defaultStageDisplayName,
         stacks: assembly.stacks,
       });
     }
   }
 
-  private stageDiffInfo(stageInfo: StageInfo[], templateDiffs: { [stackName: string]: TemplateDiff }): StageDiffInfo[] {
-    return stageInfo.flatMap((stage) => {
+  private get templateDiffs(): { [stackName: string]: TemplateDiff } {
+    if (!this._templateDiffs) {
+      throw new Error('Template diffs have not been created yet');
+    }
+    return this._templateDiffs;
+  }
+
+  private get stageDiffInfo(): StageDiffInfo[] {
+    if (this._stages) {
+      return this._stages;
+    }
+    this._stages = this.stageInfo.flatMap((stage) => {
       this.stageComments[stage.name] = {
         title: this.options.title,
         destructiveChanges: 0,
@@ -125,50 +126,24 @@ export class AssemblyProcessor {
       return {
         name: stage.name,
         stacks: stage.stacks.map((stack) => {
-          if (!templateDiffs[stack.name]) {
+          if (!this.templateDiffs[stack.name]) {
             throw new Error(
               `Template diffs have not been created yet for stack ${stack.name}`,
             );
           }
           return {
             stackName: stack.name,
-            diff: templateDiffs[stack.name],
+            diff: this.templateDiffs[stack.name],
           };
         }),
       };
     });
+    return this._stages;
   }
 
-  public async diffApps(): Promise<AppDetails[]> {
-    return Promise.all(
-      this.options.cdkOutDir.map(async (dir) => {
-        try {
-          return await this.diffApp(dir);
-        } catch (e: any) {
-          const appDetails: AppDetails = {cdkOutDir: dir};
-          if (e.message.includes('This app contains no stacks')) {
-            console.warn('Empty app: ', e);
-            appDetails.error = 'This app contains no stacks';
-          }
-          else if (e.message.includes('AuthenticationError') || e.message.includes('Could not assume role')) {
-            console.warn('Authentication error: ', e);
-            appDetails.error = 'Authentication error: ' + e.message;
-          }
-          else {
-            console.error('Error diffing app: ', e);
-            appDetails.error = 'Error diffing app: ' + e.message;
-          }
-          return appDetails;
-        }
-      })
-    );
-  }
-
-  public async diffApp(cdkOutDir: string): Promise<AppDetails> {
-    console.log("Diffing directory: ", cdkOutDir);
-    const appDetails : AppDetails = {cdkOutDir};
+  public async diffApp(): Promise<{ [name: string]: TemplateDiff }> {
     const assemblySource = await this.options.toolkit.fromAssemblyDirectory(
-      cdkOutDir,
+      this.options.cdkOutDir,
       {
         // When checkVersion=true it means users can't upgrade their CDK version before
         // we do and they pull in the new action version. Probably better to default to false
@@ -194,24 +169,12 @@ export class AssemblyProcessor {
       method: this.options.diffMethod,
     });
 
-    // Ignore differences in Tags
-    for (const [_, stackDiff] of Object.entries(diffResult)) {
-      if (!stackDiff['resources'] || !stackDiff['resources']['diffs']) {
-        continue;
-      }
-      for (const [_, resourceDiff] of Object.entries(stackDiff['resources']['diffs'])) {
-        const typedResourceDiff = resourceDiff as ResourceDifference;
-        if (typedResourceDiff['propertyDiffs']['Tags']) {
-          typedResourceDiff['propertyDiffs']['Tags']['isDifferent'] = false;
-          typedResourceDiff['propertyDiffs']['Tags']['changeImpact'] = ResourceImpact.NO_CHANGE;
-        }
-      }
-    }
+    console.log(`Diff result: ${JSON.stringify(diffResult, null, 2)}`);
 
-    appDetails.templateDiffs = diffResult;
+    this._templateDiffs = diffResult;
     await using cloudAssembly = await assemblySource.produce();
-    this.processAssembly(cloudAssembly.cloudAssembly, appDetails);
-    return appDetails;
+    this.processAssembly(cloudAssembly.cloudAssembly);
+    return diffResult;
   }
 
   /**
@@ -219,39 +182,11 @@ export class AssemblyProcessor {
    * the comment can be created with `commentStages()`
    */
   public async processStages(ignoreDestructiveChanges: string[] = []) {
-    if (!this._appDetails) {
-      this._appDetails = await this.diffApps();
+    if (!this._templateDiffs) {
+      await this.diffApp();
     }
-
-    const mergedStageInfo: StageInfo[] = [];
-    let mergedTemplateDiffs: { [stackName: string]: TemplateDiff } = {};
-
-    // Across multiple apps, merge stage info and template diffs
-    this._appDetails.forEach((appDetails, _i) => {
-      // Check for errors
-      if (appDetails.error) {
-        this.otherMessages.push(`Error processing app at ${appDetails.cdkOutDir}: ${appDetails.error}`);
-        return;
-      }
-      if (!appDetails.stageInfo || !appDetails.templateDiffs) {
-        this.otherMessages.push(`Missing information for ${appDetails.cdkOutDir}`);
-        return;
-      }
-
-      // Merge stage info and template diffs
-      for (const stage of appDetails.stageInfo) {
-        const existingStage = mergedStageInfo.find(s => s.name === stage.name);
-        existingStage ? existingStage.stacks.push(...stage.stacks) : mergedStageInfo.push(stage);
-      }
-      mergedTemplateDiffs = {...mergedTemplateDiffs, ...appDetails.templateDiffs };
-    });
-
-    const stageDiffInfo = this.stageDiffInfo(mergedStageInfo, mergedTemplateDiffs);
-    await this.processApp(ignoreDestructiveChanges, stageDiffInfo);
-  }
-
-  public async processApp(ignoreDestructiveChanges: string[] = [], stageDiffInfo: StageDiffInfo[] = []) {
-    for (const stage of stageDiffInfo) {
+    debug(`Diffs: ${JSON.stringify(this._templateDiffs, null, 2)}`);
+    for (const stage of this.stageDiffInfo) {
       for (const stack of stage.stacks) {
         try {
           const { comment, changes } = await this.diffStack(stack);
@@ -504,12 +439,6 @@ export class AssemblyProcessor {
         `> [!WARNING]\n> ${stageComments.destructiveChanges} Destructive Changes`,
       );
       output.push('');
-    }
-    if (this.otherMessages) {
-      for (const msg of this.otherMessages) {
-        output.push(`> ${msg}`);
-        output.push('');
-      }
     }
     return output.concat(comments);
   }
