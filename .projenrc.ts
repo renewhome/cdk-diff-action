@@ -114,7 +114,8 @@ const project = new GitHubActionTypeScriptProject({
       },
     },
     runs: {
-      using: RunsUsing.NODE_20,
+      // TODO: update to RunsUsing.NODE_24 after PR https://github.com/projen/projen-github-action-typescript/pull/529 is merged and released
+      using: 'node24' as RunsUsing,
       main: 'dist/index.js',
     },
   },
@@ -130,8 +131,9 @@ const project = new GitHubActionTypeScriptProject({
   },
   deps: [
     '@aws-cdk/cloudformation-diff',
-    '@aws-cdk/cx-api',
+    '@aws-cdk/cloud-assembly-api',
     '@aws-cdk/toolkit-lib',
+    '@aws-sdk/client-cloudformation',
     '@octokit/webhooks-definitions',
     '@aws-cdk/cloud-assembly-schema',
     'fs-extra',
@@ -158,7 +160,8 @@ const project = new GitHubActionTypeScriptProject({
   jestOptions: {
     configFilePath: 'jest.config.json',
   },
-  minNodeVersion: '20',
+  minNodeVersion: '24',
+  workflowNodeVersion: '24',
 });
 
 const projenProject = project as unknown as typescript.TypeScriptProject;
